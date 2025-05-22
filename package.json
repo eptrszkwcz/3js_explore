@@ -1,0 +1,23 @@
+{
+  "name": "3js_explore",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eptrszkwcz/3js_explore.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/eptrszkwcz/3js_explore/issues"
+  },
+  "homepage": "https://github.com/eptrszkwcz/3js_explore#readme",
+  "description": "",
+  "dependencies": {
+    "three": "^0.176.0"
+  }
+}
