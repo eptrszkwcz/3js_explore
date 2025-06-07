@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2();
+let hoveredObject = null;
+
 let isDarkMode = true;
 
 const scene = new THREE.Scene();
@@ -53,10 +57,12 @@ scene.add(fillLight);
 // scene.add(new THREE.GridHelper(20, 20));
 // scene.add(new THREE.AxesHelper(2));
 
+const buildingFile = 'Context_bldg_brep'
+
 // Load models
 const objLoader = new OBJLoader();
 const modelList = [
-  { name: 'Context_bldg', light: 0xabdbde, dark: 0x548487 },
+  { name: buildingFile, light: 0xabdbde, dark: 0x548487 },
   { name: 'Context_lots', light: 0xbcf2bb, dark: 0x588558 },
   { name: 'Context_roads', light: 0xbfbdac, dark: 0x525143 },
   { name: 'Context_sidewalk', light: 0xd6d4c5, dark: 0x878470 },
@@ -113,11 +119,45 @@ window.addEventListener('resize', () => {
 });
 
 // Animate
+// function animate() {
+//   requestAnimationFrame(animate);
+//   controls.update();
+//   renderer.render(scene, camera);
+// }
+
 function animate() {
   requestAnimationFrame(animate);
+
+  // Update raycaster with camera and mouse
+  raycaster.setFromCamera(mouse, camera);
+
+  // Get all building meshes (example: from Context_bldg)
+  const buildingGroup = modelMap[buildingFile];
+  if (buildingGroup) {
+    const intersects = raycaster.intersectObjects(buildingGroup.children, true);
+
+    if (intersects.length > 0) {
+      const intersected = intersects[0].object;
+
+      if (hoveredObject !== intersected) {
+        if (hoveredObject) {
+          hoveredObject.material.emissive?.set(0x000000); // Reset previous
+        }
+        hoveredObject = intersected;
+        hoveredObject.material.emissive?.set(0x5a9094); // Highlight with yellow glow
+      }
+    } else {
+      if (hoveredObject) {
+        hoveredObject.material.emissive?.set(0x000000);
+        hoveredObject = null;
+      }
+    }
+  }
+
   controls.update();
   renderer.render(scene, camera);
 }
+
 animate();
 
 
@@ -167,4 +207,93 @@ shadowSelect.addEventListener('change', () => {
       break;
   }
 });
+
+let unlockedBuilding = null;
+let currentlyHovered = null;
+
+// Hover interaction
+
+window.addEventListener('mousemove', onMouseMove, false);
+
+// function onMouseMove(event) {
+//   // Normalize mouse coordinates to -1 to 1
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+// }
+
+function onMouseMove(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  // console.log(unlockedBuilding)
+  if (unlockedBuilding) {
+    console.log("MAMIII")
+    const intersects = raycaster.intersectObjects(unlockedBuilding.children, true);
+    if (intersects.length > 0) {
+      const hovered = intersects[0].object;
+
+      if (currentlyHovered !== hovered) {
+        if (currentlyHovered) {
+          currentlyHovered.material.color.set(0x5a9094); // reset to base
+        }
+        hovered.material.color.set(0xff0000); // highlight red
+        currentlyHovered = hovered;
+      }
+    } else if (currentlyHovered) {
+      currentlyHovered.material.color.set(0x5a9094); // reset if nothing hovered
+      currentlyHovered = null;
+    }
+  }
+}
+
+// Click interaction 
+
+
+
+// window.addEventListener('click', onMouseClick, false);
+
+// function onMouseClick(event) {
+//   raycaster.setFromCamera(mouse, camera);
+
+//   if (!unlockedBuilding) {
+//     const buildingGroup = modelMap[buildingFile]; //This is the building layer
+//     // console.log("BLDG GRP:", buildingGroup);
+//     if (!buildingGroup) return;
+
+//     const intersects = raycaster.intersectObjects(buildingGroup.children, true);
+//     if (intersects.length > 0) {
+//       // unlockedBuilding = intersects[0].object.parent;
+//       const intersects = raycaster.intersectObjects(buildingGroup.children, true);
+//       // const clicked = raycaster.intersectObjects(unlockedBuilding.children, true);
+//       unlockedBuilding = intersects[0].object;
+//       applyUnlockedStyle(unlockedBuilding);
+//       console.log('Building unlocked:', unlockedBuilding.name || unlockedBuilding.uuid);
+//     }
+//   }
+// }
+
+
+// function applyUnlockedStyle(object) {
+//   object.traverse(child => {
+//     if (child.isMesh) {
+//       child.material = new THREE.MeshStandardMaterial({
+//         color: 0x5a9094,
+//         roughness: 0.5,
+//         metalness: 0.2
+//       });
+//       child.material.needsUpdate = true;
+
+//       // Optional: add edges
+//       const edges = new THREE.EdgesGeometry(child.geometry);
+//       const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
+//       child.add(line);
+//     }
+//   });
+// }
+
+
+
+
 
