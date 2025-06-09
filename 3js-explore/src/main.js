@@ -144,7 +144,7 @@ function animate() {
           hoveredObject.material.emissive?.set(0x000000); // Reset previous
         }
         hoveredObject = intersected;
-        hoveredObject.material.emissive?.set(0x5a9094); // Highlight with yellow glow
+        hoveredObject.material.emissive?.set(0x5a9094); // Highlight 
       }
     } else {
       if (hoveredObject) {
@@ -221,79 +221,274 @@ window.addEventListener('mousemove', onMouseMove, false);
 //   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 // }
 
+let currentlyHoveredFace = null;
+
+// function onMouseMove(event) {
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+//   raycaster.setFromCamera(mouse, camera);
+
+//   if (unlockedBuilding) {
+//     console.log("unlocked")
+//     const intersects = raycaster.intersectObjects(unlockedBuilding.children, true);
+//     if (intersects.length > 0) {
+//       const intersect = intersects[0];
+//       const face = intersect.face;
+//       console.log(face)
+//       const geometry = intersect.object.geometry;
+
+//       if (!geometry || !face) return;
+
+//       // Convert to non-indexed geometry if needed
+//       if (geometry.index) {
+//         geometry = geometry.toNonIndexed();
+//       }
+
+//       // Reset previous hover
+//       if (currentlyHoveredFace && currentlyHoveredFace.object) {
+//         const geo = currentlyHoveredFace.object.geometry;
+//         const colorAttr = geo.attributes.color;
+//         if (colorAttr && currentlyHoveredFace.faceIndex !== undefined) {
+//           for (let i = 0; i < 3; i++) {
+//             const vertexIndex = currentlyHoveredFace.faceIndex * 3 + i;
+//             colorAttr.setXYZ(vertexIndex, 0.353, 0.565, 0.580); // 0x5a9094 as normalized RGB
+//           }
+//           colorAttr.needsUpdate = true;
+//         }
+//       }
+
+//       // Ensure geometry has vertex colors
+//       if (!geometry.attributes.color) {
+//         const count = geometry.attributes.position.count;
+//         const colors = new Float32Array(count * 3);
+//         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+//       }
+
+//       const colorAttr = geometry.attributes.color;
+//       const faceIndex = intersect.faceIndex;
+
+//       if (colorAttr && faceIndex !== undefined) {
+//         for (let i = 0; i < 3; i++) {
+//           const vertexIndex = faceIndex * 3 + i;
+//           colorAttr.setXYZ(vertexIndex, 0, 1, 0); // green
+//         }
+//         colorAttr.needsUpdate = true;
+//       }
+
+//       intersect.object.material.vertexColors = true;
+//       intersect.object.material.needsUpdate = true;
+
+//       currentlyHoveredFace = { object: intersect.object, faceIndex: intersect.faceIndex };
+
+//     } else if (currentlyHoveredFace && currentlyHoveredFace.object) {
+//       // Reset if nothing is hovered
+//       const geo = currentlyHoveredFace.object.geometry;
+//       const colorAttr = geo.attributes.color;
+//       if (colorAttr && currentlyHoveredFace.faceIndex !== undefined) {
+//         for (let i = 0; i < 3; i++) {
+//           const vertexIndex = currentlyHoveredFace.faceIndex * 3 + i;
+//           colorAttr.setXYZ(vertexIndex, 0.353, 0.565, 0.580); // 0x5a9094
+//         }
+//         colorAttr.needsUpdate = true;
+//       }
+//       currentlyHoveredFace = null;
+//     }
+//   }
+// }
+
+
+// function onMouseMove(event) {
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+//   raycaster.setFromCamera(mouse, camera);
+
+//   // console.log(unlockedBuilding)
+//   if (unlockedBuilding) {
+//     const intersects = raycaster.intersectObjects(unlockedBuilding.children, true);
+//     if (intersects.length > 0) {
+//       const hovered = intersects[0].object;
+
+//       if (currentlyHovered !== hovered) {
+//         if (currentlyHovered) {
+//           currentlyHovered.material.color.set(0x5a9094); // reset to base
+//         }
+//         hovered.material.color.set(0xff0000); // highlight red
+//         currentlyHovered = hovered;
+//       }
+//     } else if (currentlyHovered) {
+//       currentlyHovered.material.color.set(0x5a9094); // reset if nothing hovered
+//       currentlyHovered = null;
+//     }
+//   }
+// }
+
+window.addEventListener('click', onMouseClick, false);
+
+let clickedMesh = null;
+let selectedMesh = null;
+let selectedEdges = null;
+let selectedVertices = null;
+
+function onMouseClick(event) {
+  raycaster.setFromCamera(mouse, camera);
+
+  const buildingGroup = modelMap[buildingFile];
+  if (!buildingGroup) return;
+
+  const intersects = raycaster.intersectObjects(buildingGroup.children, true);
+
+  if (intersects.length > 0) {
+    clickedMesh = intersects[0].object;
+
+    if (selectedMesh === clickedMesh) return;
+
+    // Reset previous selection
+    if (selectedMesh) {
+      selectedMesh.material.color.set(isDarkMode ? 0x548487 : 0xabdbde);
+      if (selectedEdges) {
+        selectedMesh.remove(selectedEdges);
+        selectedEdges.geometry.dispose();
+        selectedEdges.material.dispose();
+        selectedEdges = null;
+      }
+      if (selectedVertices) {
+        selectedMesh.remove(selectedVertices);
+        selectedVertices.geometry.dispose();
+        selectedVertices.material.dispose();
+        selectedVertices = null;
+      }
+    }
+
+    // Set new selection color
+    // clickedMesh.material.color.set(0xff0000);
+    clickedMesh.material.color.set(0xfffb00);
+    selectedMesh = clickedMesh;
+
+    // Edges
+    const edgeGeo = new THREE.EdgesGeometry(clickedMesh.geometry);
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xeeff00 });
+    selectedEdges = new THREE.LineSegments(edgeGeo, edgeMat);
+    clickedMesh.add(selectedEdges);
+
+    // Vertices
+    const vertexGeo = new THREE.BufferGeometry();
+    const positions = clickedMesh.geometry.attributes.position.array;
+    vertexGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const vertexMat = new THREE.PointsMaterial({
+      color: 0x000000,
+      size: 8,
+      sizeAttenuation: false
+    });
+
+    selectedVertices = new THREE.Points(vertexGeo, vertexMat);
+    clickedMesh.add(selectedVertices);
+
+  } else {
+    // Clicked on empty space: clear selection
+    if (selectedMesh) {
+      console.log("resetting")
+      // clickedMesh = null;
+      // clickedMesh.material.color.dispose();
+      clickedMesh.material.color.set(isDarkMode ? 0x548487 : 0xabdbde);
+      selectedMesh.material.color.set(isDarkMode ? 0x548487 : 0xabdbde);
+      if (selectedEdges) {
+        selectedMesh.remove(selectedEdges);
+        selectedEdges.geometry.dispose();
+        selectedEdges.material.dispose();
+        selectedEdges = null;
+      }
+      if (selectedVertices) {
+        selectedMesh.remove(selectedVertices);
+        selectedVertices.geometry.dispose();
+        selectedVertices.material.dispose();
+        selectedVertices = null;
+      }
+      selectedMesh = null;
+    }
+  }
+}
+
+
+
+// let currentlyHoveredFace = null;
+
 function onMouseMove(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
 
-  // console.log(unlockedBuilding)
-  if (unlockedBuilding) {
-    console.log("MAMIII")
-    const intersects = raycaster.intersectObjects(unlockedBuilding.children, true);
+  if (selectedMesh) {
+    const intersects = raycaster.intersectObject(selectedMesh, true);
     if (intersects.length > 0) {
-      const hovered = intersects[0].object;
+      const intersect = intersects[0];
+      const face = intersect.face;
+      let geometry = intersect.object.geometry;
 
-      if (currentlyHovered !== hovered) {
-        if (currentlyHovered) {
-          currentlyHovered.material.color.set(0x5a9094); // reset to base
-        }
-        hovered.material.color.set(0xff0000); // highlight red
-        currentlyHovered = hovered;
+      if (!geometry || !face) return;
+
+      // Convert to non-indexed geometry if needed
+      if (geometry.index) {
+        geometry = geometry.toNonIndexed();
+        intersect.object.geometry = geometry; // update reference
       }
-    } else if (currentlyHovered) {
-      currentlyHovered.material.color.set(0x5a9094); // reset if nothing hovered
-      currentlyHovered = null;
+
+      // Reset previously hovered face color
+      if (currentlyHoveredFace && currentlyHoveredFace.object) {
+        const geo = currentlyHoveredFace.object.geometry;
+        const colorAttr = geo.attributes.color;
+        if (colorAttr && currentlyHoveredFace.faceIndex !== undefined) {
+          for (let i = 0; i < 3; i++) {
+            const vertexIndex = currentlyHoveredFace.faceIndex * 3 + i;
+            colorAttr.setXYZ(vertexIndex, 1.0, 0.0, 0.0); // reset to red
+          }
+          colorAttr.needsUpdate = true;
+        }
+      }
+
+      // Ensure geometry has vertex colors
+      if (!geometry.attributes.color) {
+        const count = geometry.attributes.position.count;
+        const colors = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++) {
+          colors[i * 3] = 1.0;   // R
+          colors[i * 3 + 1] = 0.0; // G
+          colors[i * 3 + 2] = 0.0; // B
+        }
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      }
+
+      // Highlight hovered face in green
+      const colorAttr = geometry.attributes.color;
+      const faceIndex = intersect.faceIndex;
+
+      for (let i = 0; i < 3; i++) {
+        const vertexIndex = faceIndex * 3 + i;
+        colorAttr.setXYZ(vertexIndex, 0.0, 1.0, 0.0); // green
+      }
+      colorAttr.needsUpdate = true;
+
+      intersect.object.material.vertexColors = true;
+      intersect.object.material.needsUpdate = true;
+
+      currentlyHoveredFace = { object: intersect.object, faceIndex: intersect.faceIndex };
+    } else if (currentlyHoveredFace && currentlyHoveredFace.object) {
+      const geo = currentlyHoveredFace.object.geometry;
+      const colorAttr = geo.attributes.color;
+      if (colorAttr && currentlyHoveredFace.faceIndex !== undefined) {
+        for (let i = 0; i < 3; i++) {
+          const vertexIndex = currentlyHoveredFace.faceIndex * 3 + i;
+          colorAttr.setXYZ(vertexIndex, 1.0, 0.0, 0.0); // back to red
+        }
+        colorAttr.needsUpdate = true;
+      }
+      currentlyHoveredFace = null;
     }
   }
 }
-
-// Click interaction 
-
-
-
-// window.addEventListener('click', onMouseClick, false);
-
-// function onMouseClick(event) {
-//   raycaster.setFromCamera(mouse, camera);
-
-//   if (!unlockedBuilding) {
-//     const buildingGroup = modelMap[buildingFile]; //This is the building layer
-//     // console.log("BLDG GRP:", buildingGroup);
-//     if (!buildingGroup) return;
-
-//     const intersects = raycaster.intersectObjects(buildingGroup.children, true);
-//     if (intersects.length > 0) {
-//       // unlockedBuilding = intersects[0].object.parent;
-//       const intersects = raycaster.intersectObjects(buildingGroup.children, true);
-//       // const clicked = raycaster.intersectObjects(unlockedBuilding.children, true);
-//       unlockedBuilding = intersects[0].object;
-//       applyUnlockedStyle(unlockedBuilding);
-//       console.log('Building unlocked:', unlockedBuilding.name || unlockedBuilding.uuid);
-//     }
-//   }
-// }
-
-
-// function applyUnlockedStyle(object) {
-//   object.traverse(child => {
-//     if (child.isMesh) {
-//       child.material = new THREE.MeshStandardMaterial({
-//         color: 0x5a9094,
-//         roughness: 0.5,
-//         metalness: 0.2
-//       });
-//       child.material.needsUpdate = true;
-
-//       // Optional: add edges
-//       const edges = new THREE.EdgesGeometry(child.geometry);
-//       const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
-//       child.add(line);
-//     }
-//   });
-// }
-
-
 
 
 
