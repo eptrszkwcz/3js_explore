@@ -57,16 +57,20 @@ scene.add(fillLight);
 // scene.add(new THREE.GridHelper(20, 20));
 // scene.add(new THREE.AxesHelper(2));
 
-const buildingFile = 'Context_bldg_brep'
+// const buildingFile = 'Context_bldg_brep'
+const buildingFile = 'Small_bldgs2';
+
+const lotFile = 'Small_lots2';
+
 
 // Load models
 const objLoader = new OBJLoader();
 const modelList = [
   { name: buildingFile, light: 0xabdbde, dark: 0x548487 },
-  { name: 'Context_lots', light: 0xbcf2bb, dark: 0x588558 },
-  { name: 'Context_roads', light: 0xbfbdac, dark: 0x525143 },
-  { name: 'Context_sidewalk', light: 0xd6d4c5, dark: 0x878470 },
-  { name: 'Site', light: 0xff6bc4, dark: 0xff6bc4 }, // same color in both modes
+  { name: lotFile, light: 0xbcf2bb, dark: 0x588558 },
+  // { name: 'Context_roads', light: 0xbfbdac, dark: 0x525143 },
+  // { name: 'Context_sidewalk', light: 0xd6d4c5, dark: 0x878470 },
+  // { name: 'Site', light: 0xff6bc4, dark: 0xff6bc4 }, // same color in both modes
 ];
 
 const modelMap = {};
@@ -341,6 +345,7 @@ function onMouseClick(event) {
 
   if (intersects.length > 0) {
     clickedMesh = intersects[0].object;
+    console.log(clickedMesh.children)
 
     if (selectedMesh === clickedMesh) return;
 
@@ -426,6 +431,7 @@ function onMouseMove(event) {
     if (intersects.length > 0) {
       const intersect = intersects[0];
       const face = intersect.face;
+      // console.log(intersect.object.geometry)
       let geometry = intersect.object.geometry;
 
       if (!geometry || !face) return;
