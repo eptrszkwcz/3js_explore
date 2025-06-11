@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2();
@@ -58,7 +59,8 @@ scene.add(fillLight);
 // scene.add(new THREE.AxesHelper(2));
 
 // const buildingFile = 'Context_bldg_brep'
-const buildingFile = 'Small_bldgs2';
+// const buildingFile = 'Small_bldgs2';
+const buildingFile = 'site-sample';
 
 const lotFile = 'Small_lots2';
 
@@ -66,23 +68,57 @@ const lotFile = 'Small_lots2';
 // Load models
 const objLoader = new OBJLoader();
 const modelList = [
-  { name: buildingFile, light: 0xabdbde, dark: 0x548487 },
-  { name: lotFile, light: 0xbcf2bb, dark: 0x588558 },
+  // { name: buildingFile, light: 0xabdbde, dark: 0x548487 },
+  // { name: lotFile, light: 0xbcf2bb, dark: 0x588558 },
   // { name: 'Context_roads', light: 0xbfbdac, dark: 0x525143 },
   // { name: 'Context_sidewalk', light: 0xd6d4c5, dark: 0x878470 },
   // { name: 'Site', light: 0xff6bc4, dark: 0xff6bc4 }, // same color in both modes
+  { name: 'site-sample', light: 0xff6bc4, dark: 0xff6bc4 }, // GLB
 ];
+
+const modelColors = {
+  [buildingFile]: { light: 0xabdbde, dark: 0x548487 },
+  [lotFile]: { light: 0xbcf2bb, dark: 0x588558 },
+  // 'site-sample': { light: 0xff6bc4, dark: 0xff6bc4 },
+};
+
+const gltfLoader = new GLTFLoader();
+
+gltfLoader.load('/models/site-sample.glb', (gltf) => {
+  const glbScene = gltf.scene;
+
+  glbScene.traverse((child) => {
+    if (child.isMesh) {
+      child.material = new THREE.MeshStandardMaterial({
+        color: modelColors['site-sample'].dark,
+        roughness: 0.6,
+        metalness: 0.1,
+      });
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  glbScene.name = 'site-sample';
+  modelMap['site-sample'] = glbScene;
+  scene.add(glbScene);
+
+}, undefined, (err) => {
+  console.error('Error loading site-sample.glb:', err);
+});
+
+
 
 const modelMap = {};
 
-modelList.forEach(({ name, light, dark }) => {
+[buildingFile, lotFile].forEach((name) => {
   objLoader.load(`/models/${name}.obj`, (object) => {
     object.traverse((child) => {
       if (child.isMesh) {
         child.material = new THREE.MeshStandardMaterial({
-          color: dark,
+          color: modelColors[name].dark,
           roughness: 0.6,
-          metalness: 0.1
+          metalness: 0.1,
         });
         child.castShadow = true;
         child.receiveShadow = true;
@@ -95,6 +131,43 @@ modelList.forEach(({ name, light, dark }) => {
     console.error(`Error loading ${name}.obj:`, err);
   });
 });
+
+Object.keys(modelMap).forEach((name) => {
+  const model = modelMap[name];
+  const { light, dark } = modelColors[name];
+  if (model) {
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.material.color.set(isDarkMode ? dark : light);
+      }
+    });
+  }
+});
+
+
+
+// const modelMap = {};
+
+// modelList.forEach(({ name, light, dark }) => {
+//   objLoader.load(`/models/${name}.obj`, (object) => {
+//     object.traverse((child) => {
+//       if (child.isMesh) {
+//         child.material = new THREE.MeshStandardMaterial({
+//           color: dark,
+//           roughness: 0.6,
+//           metalness: 0.1
+//         });
+//         child.castShadow = true;
+//         child.receiveShadow = true;
+//       }
+//     });
+//     object.name = name;
+//     modelMap[name] = object;
+//     scene.add(object);
+//   }, undefined, (err) => {
+//     console.error(`Error loading ${name}.obj:`, err);
+//   });
+// });
 
 // Add button to toggle style
 const view_mod = document.getElementById('but-view-mod');
@@ -219,114 +292,8 @@ let currentlyHovered = null;
 
 window.addEventListener('mousemove', onMouseMove, false);
 
-// function onMouseMove(event) {
-//   // Normalize mouse coordinates to -1 to 1
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-// }
 
 let currentlyHoveredFace = null;
-
-// function onMouseMove(event) {
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-//   raycaster.setFromCamera(mouse, camera);
-
-//   if (unlockedBuilding) {
-//     console.log("unlocked")
-//     const intersects = raycaster.intersectObjects(unlockedBuilding.children, true);
-//     if (intersects.length > 0) {
-//       const intersect = intersects[0];
-//       const face = intersect.face;
-//       console.log(face)
-//       const geometry = intersect.object.geometry;
-
-//       if (!geometry || !face) return;
-
-//       // Convert to non-indexed geometry if needed
-//       if (geometry.index) {
-//         geometry = geometry.toNonIndexed();
-//       }
-
-//       // Reset previous hover
-//       if (currentlyHoveredFace && currentlyHoveredFace.object) {
-//         const geo = currentlyHoveredFace.object.geometry;
-//         const colorAttr = geo.attributes.color;
-//         if (colorAttr && currentlyHoveredFace.faceIndex !== undefined) {
-//           for (let i = 0; i < 3; i++) {
-//             const vertexIndex = currentlyHoveredFace.faceIndex * 3 + i;
-//             colorAttr.setXYZ(vertexIndex, 0.353, 0.565, 0.580); // 0x5a9094 as normalized RGB
-//           }
-//           colorAttr.needsUpdate = true;
-//         }
-//       }
-
-//       // Ensure geometry has vertex colors
-//       if (!geometry.attributes.color) {
-//         const count = geometry.attributes.position.count;
-//         const colors = new Float32Array(count * 3);
-//         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-//       }
-
-//       const colorAttr = geometry.attributes.color;
-//       const faceIndex = intersect.faceIndex;
-
-//       if (colorAttr && faceIndex !== undefined) {
-//         for (let i = 0; i < 3; i++) {
-//           const vertexIndex = faceIndex * 3 + i;
-//           colorAttr.setXYZ(vertexIndex, 0, 1, 0); // green
-//         }
-//         colorAttr.needsUpdate = true;
-//       }
-
-//       intersect.object.material.vertexColors = true;
-//       intersect.object.material.needsUpdate = true;
-
-//       currentlyHoveredFace = { object: intersect.object, faceIndex: intersect.faceIndex };
-
-//     } else if (currentlyHoveredFace && currentlyHoveredFace.object) {
-//       // Reset if nothing is hovered
-//       const geo = currentlyHoveredFace.object.geometry;
-//       const colorAttr = geo.attributes.color;
-//       if (colorAttr && currentlyHoveredFace.faceIndex !== undefined) {
-//         for (let i = 0; i < 3; i++) {
-//           const vertexIndex = currentlyHoveredFace.faceIndex * 3 + i;
-//           colorAttr.setXYZ(vertexIndex, 0.353, 0.565, 0.580); // 0x5a9094
-//         }
-//         colorAttr.needsUpdate = true;
-//       }
-//       currentlyHoveredFace = null;
-//     }
-//   }
-// }
-
-
-// function onMouseMove(event) {
-//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-//   raycaster.setFromCamera(mouse, camera);
-
-//   // console.log(unlockedBuilding)
-//   if (unlockedBuilding) {
-//     const intersects = raycaster.intersectObjects(unlockedBuilding.children, true);
-//     if (intersects.length > 0) {
-//       const hovered = intersects[0].object;
-
-//       if (currentlyHovered !== hovered) {
-//         if (currentlyHovered) {
-//           currentlyHovered.material.color.set(0x5a9094); // reset to base
-//         }
-//         hovered.material.color.set(0xff0000); // highlight red
-//         currentlyHovered = hovered;
-//       }
-//     } else if (currentlyHovered) {
-//       currentlyHovered.material.color.set(0x5a9094); // reset if nothing hovered
-//       currentlyHovered = null;
-//     }
-//   }
-// }
 
 window.addEventListener('click', onMouseClick, false);
 
