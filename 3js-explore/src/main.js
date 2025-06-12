@@ -4,14 +4,18 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 let camera, scene, renderer, controls, raycaster;
 let mouse = new THREE.Vector2();
+
 let hoveredBlock = null;
-const blockMap = new Map();
-
 let activeBlockId = null;
+let activeBuildingId = null;
 let hoveredMeshes = [];
-const edgeLines = []; // for storing yellow outlines
 
+const blockMap = new Map();       // blockId → Mesh[]
+const buildingMap = new Map();    // blockId + buildingId → Mesh[]
 
+const meshKey = (block, building) => `${block}-${building}`;
+const edgeLines = [];            // 👈 add this
+const vertexPoints = [];  
 
 init();
 animate();
@@ -56,22 +60,26 @@ function init() {
 
   const loader = new THREE.ObjectLoader();
   loader.load('/models/trial6.json', (loadedScene) => {
+    
     loadedScene.traverse((child) => {
       if (child.isMesh) {
-        // Store original material
-        child.userData.originalMaterial = child.material.clone();
-
-        // Add to block map
         const blockId = child.userData.block;
+        const buildingId = child.userData.building;
+
+        // Populate block map
         if (blockId !== undefined) {
-          if (!blockMap.has(blockId)) {
-            blockMap.set(blockId, []);
-          }
+          if (!blockMap.has(blockId)) blockMap.set(blockId, []);
           blockMap.get(blockId).push(child);
         }
 
-        // Enable raycasting
-        child.material.transparent = true;
+        // Populate building map
+        if (blockId !== undefined && buildingId !== undefined) {
+          const key = meshKey(blockId, buildingId);
+          if (!buildingMap.has(key)) buildingMap.set(key, []);
+          buildingMap.get(key).push(child);
+        }
+
+        child.userData.originalMaterial = child.material.clone();
       }
     });
     scene.add(loadedScene);
@@ -93,33 +101,68 @@ function onMouseMove(event) {
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
-
-  let allMeshes = Array.from(blockMap.values()).flat();
+  const allMeshes = Array.from(blockMap.values()).flat();
   const intersects = raycaster.intersectObjects(allMeshes);
 
   clearHighlights();
 
-  if (intersects.length > 0) {
-    const hovered = intersects[0].object;
-    const blockId = hovered.userData.block;
+  if (intersects.length === 0) return;
 
-    if (activeBlockId === null) {
-      // Block-level hover
-      hoveredMeshes = blockMap.get(blockId) || [];
-    }  else if (
-      blockId === activeBlockId &&
-      (hovered.userData.building !== undefined || hovered.userData.park !== undefined)
-    ) {
-      // Hover within unlocked block, only buildings or parks
-      hoveredMeshes = [hovered];
-    }
+  const hovered = intersects[0].object;
+  const blockId = hovered.userData.block;
+  const buildingId = hovered.userData.building;
 
-    hoveredMeshes.forEach(mesh => {
-      mesh.material = mesh.material.clone();
-      mesh.material.color.set(0xff69b4); // pink
-    });
+  if (!activeBlockId) {
+    // Block level
+    hoveredMeshes = blockMap.get(blockId) || [];
+  } else if (!activeBuildingId && blockId === activeBlockId && buildingId !== undefined) {
+    // Building level
+    const key = meshKey(blockId, buildingId);
+    hoveredMeshes = buildingMap.get(key) || [];
+  } else if (blockId === activeBlockId && buildingId === activeBuildingId) {
+    // Face level
+    hoveredMeshes = [hovered];
   }
+
+  hoveredMeshes.forEach((m) => {
+    m.material = m.material.clone();
+    m.material.color.set(0xff69b4); // pink
+  });
 }
+
+
+// function onMouseMove(event) {
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+//   raycaster.setFromCamera(mouse, camera);
+
+//   let allMeshes = Array.from(blockMap.values()).flat();
+//   const intersects = raycaster.intersectObjects(allMeshes);
+
+//   clearHighlights();
+
+//   if (intersects.length > 0) {
+//     const hovered = intersects[0].object;
+//     const blockId = hovered.userData.block;
+
+//     if (activeBlockId === null) {
+//       // Block-level hover
+//       hoveredMeshes = blockMap.get(blockId) || [];
+//     }  else if (
+//       blockId === activeBlockId &&
+//       (hovered.userData.building !== undefined || hovered.userData.park !== undefined)
+//     ) {
+//       // Hover within unlocked block, only buildings or parks
+//       hoveredMeshes = [hovered];
+//     }
+
+//     hoveredMeshes.forEach(mesh => {
+//       mesh.material = mesh.material.clone();
+//       mesh.material.color.set(0xff69b4); // pink
+//     });
+//   }
+// }
 
 window.addEventListener('click', onClick, false);
 
@@ -131,29 +174,69 @@ function onClick(event) {
   const allMeshes = Array.from(blockMap.values()).flat();
   const intersects = raycaster.intersectObjects(allMeshes);
 
-  if (intersects.length > 0) {
-    const clicked = intersects[0].object;
-    const clickedBlock = clicked.userData.block;
-
-    if (activeBlockId === clickedBlock) {
-      activeBlockId = null;
-      clearBlockEdges();
-      clearBlockVertices();
-    } else {
-      activeBlockId = clickedBlock;
-      showBlockEdges(clickedBlock);
-      showBlockVertices(clickedBlock); 
-    }
-    
-  } else {
-    // Clicked outside → lock
+  if (intersects.length === 0) {
+    // Reset
     activeBlockId = null;
+    activeBuildingId = null;
+    clearHighlights();
+    clearBlockEdges();
+    clearBlockVertices();
+    return;
+  }
+
+  const clicked = intersects[0].object;
+  const blockId = clicked.userData.block;
+  const buildingId = clicked.userData.building;
+
+  if (!activeBlockId) {
+    activeBlockId = blockId;
+    showBlockEdges(blockId);
+    showBlockVertices(blockId);
+  } else if (!activeBuildingId && blockId === activeBlockId && buildingId !== undefined) {
+    activeBuildingId = buildingId;
+  } else {
+    // Deselect
+    activeBlockId = null;
+    activeBuildingId = null;
     clearBlockEdges();
     clearBlockVertices();
   }
 
   clearHighlights();
 }
+
+
+// function onClick(event) {
+//   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+//   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+//   raycaster.setFromCamera(mouse, camera);
+//   const allMeshes = Array.from(blockMap.values()).flat();
+//   const intersects = raycaster.intersectObjects(allMeshes);
+
+//   if (intersects.length > 0) {
+//     const clicked = intersects[0].object;
+//     const clickedBlock = clicked.userData.block;
+
+//     if (activeBlockId === clickedBlock) {
+//       activeBlockId = null;
+//       clearBlockEdges();
+//       clearBlockVertices();
+//     } else {
+//       activeBlockId = clickedBlock;
+//       showBlockEdges(clickedBlock);
+//       showBlockVertices(clickedBlock); 
+//     }
+    
+//   } else {
+//     // Clicked outside → lock
+//     activeBlockId = null;
+//     clearBlockEdges();
+//     clearBlockVertices();
+//   }
+
+//   clearHighlights();
+// }
 
 
 
@@ -188,7 +271,7 @@ function showBlockEdges(blockId) {
   });
 }
 
-const vertexPoints = []; // store to remove later
+// const vertexPoints = []; // store to remove later
 
 function showBlockVertices(blockId) {
   clearBlockVertices();
