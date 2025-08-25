@@ -59,7 +59,7 @@ function init() {
   // Load JSON scene
 
   const loader = new THREE.ObjectLoader();
-  loader.load('/models/trial6.json', (loadedScene) => {
+  loader.load('/models/masterplan-0820-1-orientation.json', (loadedScene) => {
     
     loadedScene.traverse((child) => {
       if (child.isMesh) {
